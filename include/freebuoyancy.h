@@ -6,7 +6,6 @@
 
 
 
-
 namespace gazebo {
 
 class FreeBuoyancyPlugin : public  ModelPlugin {
@@ -14,6 +13,7 @@ public:
 
     virtual void Load(physics::ModelPtr _model, sdf::ElementPtr _sdf);
     virtual void OnUpdate();
+
 
 private:
     struct link_st {
@@ -53,6 +53,11 @@ private:
     std::vector<model_st> parsed_models_;
 
     ignition::math::Vector3d fluid_velocity_;
+    double velocityFactor;
+    double clampingValue;
+    ignition::math::Vector2d xRange;
+    ignition::math::Vector2d yRange;
+    ignition::math::Vector2d zRange;
 
 };
 
