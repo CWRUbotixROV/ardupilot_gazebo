@@ -52,9 +52,12 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
 
     if (_sdf->HasElement("fluidTopic"))  fluid_topic = _sdf->Get<std::string>("fluidTopic");
 
+    //Magic Numbers Area!
     fluid_velocity_.Set(0, 0, 0);
     velocityFactor = 0.99;
     clampingValue = 0.2;
+    updateTimer = 0;
+    waveTimer = 100;
 
     // Register plugin update
     update_event_ = event::Events::ConnectWorldUpdateBegin(boost::bind(&FreeBuoyancyPlugin::OnUpdate, this));
@@ -120,38 +123,43 @@ void FreeBuoyancyPlugin::OnUpdate() {
                 }
             }
         }
-        //Set xyz clamps
-        xRange.X(fluid_velocity_.X() - clampingValue);
-        xRange.Y(fluid_velocity_.X() + clampingValue);
-        yRange.X(fluid_velocity_.Y() - clampingValue);
-        yRange.Y(fluid_velocity_.Y() + clampingValue);
-        zRange.X(fluid_velocity_.Z() - clampingValue);
-        zRange.Y(fluid_velocity_.Z() + clampingValue);
-        
-        
-        //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
-        // Get a random velocity value.
-        fluid_velocity_.Set(
-            ignition::math::Rand::DblUniform(-1, 1),
-            ignition::math::Rand::DblUniform(-1, 1),
-            ignition::math::Rand::DblUniform(-1, 1));
+        updateTimer ++;
+        if(updateTimer = waveTimer)
+        {
+            //Set xyz clamps
+            xRange.X(fluid_velocity_.X() - clampingValue);
+            xRange.Y(fluid_velocity_.X() + clampingValue);
+            yRange.X(fluid_velocity_.Y() - clampingValue);
+            yRange.Y(fluid_velocity_.Y() + clampingValue);
+            zRange.X(fluid_velocity_.Z() - clampingValue);
+            zRange.Y(fluid_velocity_.Z() + clampingValue);
+            
+            
+            //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
+            // Get a random velocity value.
+            fluid_velocity_.Set(
+                ignition::math::Rand::DblUniform(-1, 1),
+                ignition::math::Rand::DblUniform(-1, 1),
+                ignition::math::Rand::DblUniform(-1, 1));
 
-        // Apply scaling factor
-        fluid_velocity_.Normalize();
-        fluid_velocity_ *= velocityFactor;
+            // Apply scaling factor
+            fluid_velocity_.Normalize();
+            fluid_velocity_ *= velocityFactor;
 
-        // Clamp X value
-        fluid_velocity_.X(ignition::math::clamp(fluid_velocity_.X(),
-            xRange.X(), xRange.Y()));
+            // Clamp X value
+            fluid_velocity_.X(ignition::math::clamp(fluid_velocity_.X(),
+                xRange.X(), xRange.Y()));
 
-        // Clamp Y value
-        fluid_velocity_.Y(ignition::math::clamp(fluid_velocity_.Y(),
-            yRange.X(), yRange.Y()));
+            // Clamp Y value
+            fluid_velocity_.Y(ignition::math::clamp(fluid_velocity_.Y(),
+                yRange.X(), yRange.Y()));
 
-        // Clamp Z value
-        fluid_velocity_.Z(ignition::math::clamp(fluid_velocity_.Z(),
-            zRange.X(), zRange.Y()));
-
+            // Clamp Z value
+            fluid_velocity_.Z(ignition::math::clamp(fluid_velocity_.Z(),
+                zRange.X(), zRange.Y()));
+            
+            updateTimer = 0;
+        }
 
         // get velocity damping
         // linear velocity difference in the link frame
