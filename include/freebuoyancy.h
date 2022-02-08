@@ -55,6 +55,8 @@ private:
     ignition::math::Vector3d fluid_velocity_;
     double velocityFactor;
     double clampingValue;
+    double updateTimer;
+    double waveTimer;
     ignition::math::Vector2d xRange;
     ignition::math::Vector2d yRange;
     ignition::math::Vector2d zRange;

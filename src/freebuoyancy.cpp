@@ -70,58 +70,120 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
 }
 
 void FreeBuoyancyPlugin::OnUpdate() {
+    try {
 
-    // look for new world models
-    unsigned int i;
-    std::vector<model_st>::iterator model_it;
-    bool found;
+        // look for new world models
+        unsigned int i;
+        std::vector<model_st>::iterator model_it;
+        bool found;
 
-    for (i=0; i<world_->ModelCount(); ++i) {
-        found = false;
-        for (model_it = parsed_models_.begin(); model_it!=parsed_models_.end(); ++model_it) {
-            if (world_->ModelByIndex(i)->GetName() == model_it->name)
-                found = true;
-        }
-        if (!found && !(world_->ModelByIndex(i)->IsStatic())) // model not in listand not static, parse it for potential buoyancy flags
-            ParseNewModel(world_->ModelByIndex(i));
-    }
-
-    // look for deleted world models
-    model_it = parsed_models_.begin();
-    while (model_it != parsed_models_.end()) {
-        found = false;
         for (i=0; i<world_->ModelCount(); ++i) {
-            if (world_->ModelByIndex(i)->GetName() == model_it->name)
-                found = true;
+            found = false;
+            for (model_it = parsed_models_.begin(); model_it!=parsed_models_.end(); ++model_it) {
+                if (world_->ModelByIndex(i)->GetName() == model_it->name)
+                    found = true;
+            }
+            if (!found && !(world_->ModelByIndex(i)->IsStatic())) // model not in listand not static, parse it for potential buoyancy flags
+                ParseNewModel(world_->ModelByIndex(i));
         }
-        if (!found) // model name not in world anymore, remove the corresponding links
-            RemoveDeletedModel(model_it);
-        else
-            ++model_it;
-    }
 
-    // here buoy_links is up-to-date with the links that are subject to buoyancy, let's apply it
-    ignition::math::Vector3d actual_force, cob_position, velocity_difference, torque;
-    double signed_distance_to_surface;
-    for (std::vector<link_st>::iterator link_it = buoyant_links_.begin(); link_it!=buoyant_links_.end(); ++link_it) {
-        // get world position of the center of buoyancy
-        cob_position = link_it->link->WorldPose().Pos() + link_it->link->WorldPose().Rot().RotateVector(link_it->buoyancy_center);
-        // start from the theoretical buoyancy force
-        actual_force = link_it->buoyant_force;
-        if (has_surface_) {
-            // adjust force depending on distance to surface (very simple model)
-            signed_distance_to_surface = surface_plane_.W()
-                                         - surface_plane_.X() * cob_position.X()
-                                         - surface_plane_.Y() * cob_position.Y()
-                                         - surface_plane_.Z() * cob_position.Z();
-            if (signed_distance_to_surface > -link_it->limit) {
-                if (signed_distance_to_surface > link_it->limit) {
-                    actual_force *= 0;
-                    return;
-                } else {
-                    actual_force *= cos(M_PI/4.*(signed_distance_to_surface/link_it->limit + 1));
+        // look for deleted world models
+        model_it = parsed_models_.begin();
+        while (model_it != parsed_models_.end()) {
+            found = false;
+            for (i=0; i<world_->ModelCount(); ++i) {
+                if (world_->ModelByIndex(i)->GetName() == model_it->name)
+                    found = true;
+            }
+            if (!found) // model name not in world anymore, remove the corresponding links
+                RemoveDeletedModel(model_it);
+            else
+                ++model_it;
+        }
+
+        // here buoy_links is up-to-date with the links that are subject to buoyancy, let's apply it
+        ignition::math::Vector3d actual_force, cob_position, velocity_difference, torque;
+        double signed_distance_to_surface;
+        for (std::vector<link_st>::iterator link_it = buoyant_links_.begin(); link_it!=buoyant_links_.end(); ++link_it) {
+            // get world position of the center of buoyancy
+            cob_position = link_it->link->WorldPose().Pos() + link_it->link->WorldPose().Rot().RotateVector(link_it->buoyancy_center);
+            // start from the theoretical buoyancy force
+            actual_force = link_it->buoyant_force;
+            if (has_surface_) {
+                // adjust force depending on distance to surface (very simple model)
+                signed_distance_to_surface = surface_plane_.W()
+                                            - surface_plane_.X() * cob_position.X()
+                                            - surface_plane_.Y() * cob_position.Y()
+                                            - surface_plane_.Z() * cob_position.Z();
+                if (signed_distance_to_surface > -link_it->limit) {
+                    if (signed_distance_to_surface > link_it->limit) {
+                        actual_force *= 0;
+                        return;
+                    } else {
+                        actual_force *= cos(M_PI/4.*(signed_distance_to_surface/link_it->limit + 1));
+                    }
                 }
             }
+
+            updateTimer ++;
+            if(updateTimer = waveTimer)
+            {
+                updateTimer = 0;
+                //Set xyz clamps
+                xRange.X(fluid_velocity_.X() - clampingValue);
+                xRange.Y(fluid_velocity_.X() + clampingValue);
+                yRange.X(fluid_velocity_.Y() - clampingValue);
+                yRange.Y(fluid_velocity_.Y() + clampingValue);
+                zRange.X(fluid_velocity_.Z() - clampingValue);
+                zRange.Y(fluid_velocity_.Z() + clampingValue);
+                
+                
+                //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
+                // Get a random velocity value.
+                fluid_velocity_.Set(
+                    ignition::math::Rand::DblUniform(-1, 1),
+                    ignition::math::Rand::DblUniform(-1, 1),
+                    ignition::math::Rand::DblUniform(-1, 1));
+
+                // Apply scaling factor
+                fluid_velocity_.Normalize();
+                fluid_velocity_ *= velocityFactor;
+
+                // Clamp X value
+                fluid_velocity_.X(ignition::math::clamp(fluid_velocity_.X(),
+                    xRange.X(), xRange.Y()));
+
+                // Clamp Y value
+                fluid_velocity_.Y(ignition::math::clamp(fluid_velocity_.Y(),
+                    yRange.X(), yRange.Y()));
+
+                // Clamp Z value
+                fluid_velocity_.Z(ignition::math::clamp(fluid_velocity_.Z(),
+                    zRange.X(), zRange.Y()));
+
+            }
+
+            // get velocity damping
+            // linear velocity difference in the link frame
+            velocity_difference = link_st->link->WorldPose().Rot().RotateVectorReverse(link_it->link->WorldLinearVel() - fluid_velocity_);
+            // to square
+            velocity_difference.X()*= fabs(velocity_difference.X());
+            velocity_difference.Y()*= fabs(velocity_difference.Y());
+            velocity_difference.Z()*= fabs(velocity_difference.Z());
+            // apply damping coefficients
+            actual_force -= link_it->link->WorldPose().Rot().RotateVector(link_it->linear_damping * velocity_difference);
+
+            link_it->link->AddForceAtWorldPosition(actual_force, cob_position);
+
+            // same for angular damping
+            velocity_difference = link_it->link->RelativeAngularVel();
+            velocity_difference.X()*= fabs(velocity_difference.X());
+            velocity_difference.Y()*= fabs(velocity_difference.Y());
+            velocity_difference.Z()*= fabs(velocity_difference.Z());
+            link_it->link->AddRelativeTorque(-link_it->angular_damping*velocity_difference);
+
+            ignition::math::Vector3d vec;
+            ignition::math::Pose3d pose;
         }
         updateTimer ++;
         if(updateTimer = waveTimer)
@@ -182,6 +244,9 @@ void FreeBuoyancyPlugin::OnUpdate() {
 
         ignition::math::Vector3d vec;
         ignition::math::Pose3d pose;
+    }
+    catch (const std::exception& e) {
+        cout << e.what();
     }
 }
 
