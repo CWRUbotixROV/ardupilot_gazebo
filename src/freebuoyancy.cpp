@@ -55,8 +55,8 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
     //magic number area!
     fluid_velocity_.Set(0, 0, 0);
     velocityFactor = 0.99;
-    clampingValue = 0.2;
-    waveTimer = 100;
+    clampingValue = 0.9;
+    waveTimer = 50;
     updateTimer = 0;
 
     // Register plugin update
@@ -126,18 +126,18 @@ void FreeBuoyancyPlugin::OnUpdate() {
             }
 
             updateTimer ++;
-            if (updateTimer = 100)
+            
+            //Set xyz clamps
+            xRange.X(fluid_velocity_.X() - clampingValue);
+            xRange.Y(fluid_velocity_.X() + clampingValue);
+            yRange.X(fluid_velocity_.Y() - clampingValue);
+            yRange.Y(fluid_velocity_.Y() + clampingValue);
+            zRange.X(fluid_velocity_.Z() - clampingValue);
+            zRange.Y(fluid_velocity_.Z() + clampingValue);
+            
+            if (updateTimer = waveTimer)
             {
-                updateTimer = 0;
-                //Set xyz clamps
-                xRange.X(fluid_velocity_.X() - clampingValue);
-                xRange.Y(fluid_velocity_.X() + clampingValue);
-                yRange.X(fluid_velocity_.Y() - clampingValue);
-                yRange.Y(fluid_velocity_.Y() + clampingValue);
-                zRange.X(fluid_velocity_.Z() - clampingValue);
-                zRange.Y(fluid_velocity_.Z() + clampingValue);
-                
-                
+                updateTimer = 0;    
                 //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
                 // Get a random velocity value.
                 fluid_velocity_.Set(
