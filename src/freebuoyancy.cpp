@@ -54,9 +54,9 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
 
     //magic number area!
     fluid_velocity_.Set(0, 0, 0);
-    velocityFactor = 0.99;
-    clampingValue = 0.9;
-    waveTimer = 50;
+    velocityFactor = 0.9;
+    clampingValue = 0.5;
+    waveTimer = 1000;
     updateTimer = 0;
 
     // Register plugin update
@@ -67,6 +67,14 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
     parsed_models_.clear();
 
     cout << ("Loaded freebuoyancy_gazebo plugin.\n");
+}
+
+double RandomValue(double min, double max){
+   std::uniform_real_distribution<double> unif(min, max);
+   std::default_random_engine re;
+   double a_random_double = unif(re);
+
+   return a_random_double;
 }
 
 void FreeBuoyancyPlugin::OnUpdate() {
@@ -135,7 +143,7 @@ void FreeBuoyancyPlugin::OnUpdate() {
             zRange.X(fluid_velocity_.Z() - clampingValue);
             zRange.Y(fluid_velocity_.Z() + clampingValue);
             
-            if (updateTimer = waveTimer)
+            if (updateTimer == waveTimer)
             {
                 updateTimer = 0;    
                 //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
@@ -144,6 +152,9 @@ void FreeBuoyancyPlugin::OnUpdate() {
                     ignition::math::Rand::DblUniform(-1, 1),
                     ignition::math::Rand::DblUniform(-1, 1),
                     ignition::math::Rand::DblUniform(-1, 1));
+
+                waveTimer = RandomValue(1000, 5000);
+                clampingValue = RandomValue(0.05, 0.3);
 
                 // Apply scaling factor
                 fluid_velocity_.Normalize();
