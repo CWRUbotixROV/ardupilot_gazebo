@@ -54,10 +54,11 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
 
     //magic number area!
     fluid_velocity_.Set(0, 0, 0);
-    velocityFactor = 0.6;
+    velocityFactor = 0.2;
     clampingValue = 0.25;
     waveTimer = 25;
-    updateTimer = 0;
+    updateTimer = 24;
+    alternator = true;
 
     // Register plugin update
     update_event_ = event::Events::ConnectWorldUpdateBegin(boost::bind(&FreeBuoyancyPlugin::OnUpdate, this));
@@ -133,17 +134,31 @@ void FreeBuoyancyPlugin::OnUpdate() {
 
             updateTimer ++;
             
-            //Set xyz clamps
-            xRange.X(fluid_velocity_.X() - clampingValue);
-            xRange.Y(fluid_velocity_.X() + clampingValue);
-            yRange.X(fluid_velocity_.Y() - clampingValue);
-            yRange.Y(fluid_velocity_.Y() + clampingValue);
-            zRange.X(fluid_velocity_.Z() - clampingValue);
-            zRange.Y(fluid_velocity_.Z() + clampingValue);
-            
             if (updateTimer == waveTimer)
             {
                 updateTimer = 0;    
+
+                waveTimer = ignition::math::Rand::DblUniform(20,30);
+
+                if (alternator)
+                {
+                    clampingValue = ignition::math::Rand::DblUniform(0.10, 0.25);
+                    alternator = false;
+                }
+                else
+                {
+                    clampingValue = ignition::math::Rand::DblUniform(0.5, 0.9);
+                    alternator = true;
+                }
+
+                //Set xyz clamps
+                xRange.X(fluid_velocity_.X() - clampingValue);
+                xRange.Y(fluid_velocity_.X() + clampingValue);
+                yRange.X(fluid_velocity_.Y() - clampingValue);
+                yRange.Y(fluid_velocity_.Y() + clampingValue);
+                zRange.X(fluid_velocity_.Z() - clampingValue);
+                zRange.Y(fluid_velocity_.Z() + clampingValue);
+
                 //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
                 // Get a random velocity value.
                 fluid_velocity_.Set(
@@ -151,12 +166,11 @@ void FreeBuoyancyPlugin::OnUpdate() {
                     ignition::math::Rand::DblUniform(-1, 1),
                     ignition::math::Rand::DblUniform(-1, 1));
 
-                waveTimer = ignition::math::Rand::DblUniform(50,100);
-                clampingValue = ignition::math::Rand::DblUniform(1, 2.5);
 
                 // Apply scaling factor
                 fluid_velocity_.Normalize();
                 fluid_velocity_ *= velocityFactor;
+
 
                 // Clamp X value
                 fluid_velocity_.X(ignition::math::clamp(fluid_velocity_.X(),

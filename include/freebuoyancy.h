@@ -57,6 +57,7 @@ private:
     double clampingValue;
     double updateTimer;
     double waveTimer;
+    bool alternator;
     ignition::math::Vector2d xRange;
     ignition::math::Vector2d yRange;
     ignition::math::Vector2d zRange;
