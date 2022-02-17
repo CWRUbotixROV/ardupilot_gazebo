@@ -67,26 +67,25 @@ void GstCameraPlugin::startGstThread() {
   GstElement* converter  = gst_element_factory_make("videoconvert", nullptr);
 
   GstElement* encoder;
-  if (useCuda) {
-    encoder = gst_element_factory_make("nvh264enc", nullptr);
-    g_object_set(G_OBJECT(encoder), "bitrate", 800, "preset", 1, nullptr);
-  } else {
-    encoder = gst_element_factory_make("x264enc", nullptr);
-    g_object_set(G_OBJECT(encoder), "bitrate", 800, "speed-preset", 6, "tune", 4, "key-int-max", 10, nullptr);
-  }
-
   GstElement* payloader;
-  GstElement* sink;
-
-  if (useRtmp) {
-    payloader = gst_element_factory_make("flvmux", nullptr);
-    sink = gst_element_factory_make("rtmpsink", nullptr);
-    g_object_set(G_OBJECT(sink), "location", this->rtmpLocation.c_str(), nullptr);
-  } else {
+  
+  if (useH264) {
+    if (useCuda) {
+      encoder = gst_element_factory_make("nvh264enc", nullptr);
+      g_object_set(G_OBJECT(encoder), "bitrate", 800, "preset", 1, nullptr);
+    } else {
+      encoder = gst_element_factory_make("x264enc", nullptr);
+      g_object_set(G_OBJECT(encoder), "bitrate", 800, "speed-preset", 6, "tune", 4, "key-int-max", 10, nullptr);
+    }
     payloader = gst_element_factory_make("rtph264pay", nullptr);
-    sink  = gst_element_factory_make("udpsink", nullptr);
-    g_object_set(G_OBJECT(sink), "host", this->udpHost.c_str(), "port", this->udpPort, nullptr);
+
+  } else {
+    encoder = gst_element_factory_make("jpegenc", nullptr);
+    payloader = gst_element_factory_make("rtpjpegpay", nullptr);
   }
+
+  GstElement* sink  = gst_element_factory_make("udpsink", nullptr);
+  g_object_set(G_OBJECT(sink), "host", this->udpHost.c_str(), "port", this->udpPort, nullptr);
 
   if (!source || !queue || !converter || !encoder || !payloader || !sink) {
     gzerr << "ERR: Create elements failed. \n";
@@ -227,12 +226,7 @@ void GstCameraPlugin::Load(sensors::SensorPtr sensor, sdf::ElementPtr sdf)
     this->udpPort = sdf->GetElement("udpPort")->Get<int>();
   }
 
-  if (sdf->HasElement("rtmpLocation")) {
-    this->rtmpLocation = sdf->GetElement("rtmpLocation")->Get<string>();
-    this->useRtmp = true;
-  } else {
-    this->useRtmp = false;
-  }
+  this->useH264 = sdf->HasElement("useH264");
 
   // Use CUDA for video encoding
   if (sdf->HasElement("useCuda")) {
