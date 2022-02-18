@@ -71,6 +71,9 @@ add_library(freebuoyancy_gazebo SHARED
 
 target_link_libraries(freebuoyancy_gazebo ${GAZEBO_LIBRARIES})
 
+add_library(random_rotation SHARED src/random_rotation.cc)
+target_link_libraries(random_rotation ${GAZEBO_LIBRARIES})
+
 if("${GAZEBO_VERSION}" VERSION_LESS "8.0")
     add_library(GimbalSmall2dPlugin SHARED src/GimbalSmall2dPlugin.cc)
     target_link_libraries(GimbalSmall2dPlugin ${GAZEBO_LIBRARIES})
@@ -81,6 +84,7 @@ install(TARGETS ArduCopterIRLockPlugin DESTINATION ${GAZEBO_PLUGIN_PATH})
 install(TARGETS ArduPilotPlugin DESTINATION ${GAZEBO_PLUGIN_PATH})
 install(TARGETS gazebo_gst_camera_plugin DESTINATION ${GAZEBO_PLUGIN_PATH})
 install(TARGETS freebuoyancy_gazebo DESTINATION ${GAZEBO_PLUGIN_PATH})
+install(TARGETS random_rotation DESTINATION ${GAZEBO_PLUGIN_PATH})
 
 #install(DIRECTORY models DESTINATION ${GAZEBO_RESOURCE_PATH})
 #install(DIRECTORY worlds DESTINATION ${GAZEBO_RESOURCE_PATH})
