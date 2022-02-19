@@ -51,14 +51,12 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
     }
 
     if (_sdf->HasElement("fluidTopic"))  fluid_topic = _sdf->Get<std::string>("fluidTopic");
+    if (_sdf->HasElement("velocityFactor"))  velocity_factor = _sdf->Get<double>("velocityFactor");
+    if (_sdf->HasElement("clampingValue"))  clamping_value = _sdf->Get<double>("clampingValue");
+    if (_sdf->HasElement("seed"))  seed = _sdf->Get<int>("seed");
 
     //magic number area!
     fluid_velocity_.Set(0, 0, 0);
-    velocityFactor = 5;
-    clampingValue = 0.25;
-    waveTimer = 25;
-    updateTimer = 24;
-    alternator = true;
 
     // Register plugin update
     update_event_ = event::Events::ConnectWorldUpdateBegin(boost::bind(&FreeBuoyancyPlugin::OnUpdate, this));
@@ -70,9 +68,12 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
     cout << ("Loaded freebuoyancy_gazebo plugin.\n");
     
     //Print Seed
-    int seed = ignition::math::Rand::Seed();
+    if(seed != 0)
+    {
+        ignition::math::Rand::Seed(seed);
+    }
     cout << ("Seed: ");
-    cout << seed;
+    cout << ignition::math::Rand::Seed();
     cout << ("\n");
 }
 
@@ -132,32 +133,13 @@ void FreeBuoyancyPlugin::OnUpdate() {
                 }
             }
 
-            updateTimer ++;
-            
-            // if (updateTimer == waveTimer)
-            // {
-            //     updateTimer = 0;    
-
-            //     waveTimer = ignition::math::Rand::DblUniform(20,30);
-
-            //     if (alternator)
-            //     {
-            //         clampingValue = ignition::math::Rand::DblUniform(0.10, 0.25);
-            //         alternator = false;
-            //     }
-            //     else
-            //     {
-            //         clampingValue = ignition::math::Rand::DblUniform(0.5, 0.9);
-            //         alternator = true;
-            //     }
-
             //Set xyz clamps
-            xRange.X(fluid_velocity_.X() - clampingValue);
-            xRange.Y(fluid_velocity_.X() + clampingValue);
-            yRange.X(fluid_velocity_.Y() - clampingValue);
-            yRange.Y(fluid_velocity_.Y() + clampingValue);
-            zRange.X(fluid_velocity_.Z() - clampingValue);
-            zRange.Y(fluid_velocity_.Z() + clampingValue);
+            xRange.X(fluid_velocity_.X() - clamping_value);
+            xRange.Y(fluid_velocity_.X() + clamping_value);
+            yRange.X(fluid_velocity_.Y() - clamping_value);
+            yRange.Y(fluid_velocity_.Y() + clamping_value);
+            zRange.X(fluid_velocity_.Z() - clamping_value);
+            zRange.Y(fluid_velocity_.Z() + clamping_value);
 
             //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
             // Get a random velocity value.
@@ -169,7 +151,7 @@ void FreeBuoyancyPlugin::OnUpdate() {
 
             // Apply scaling factor
             fluid_velocity_.Normalize();
-            fluid_velocity_ *= velocityFactor;
+            fluid_velocity_ *= velocity_factor;
 
 
             // Clamp X value
@@ -183,7 +165,6 @@ void FreeBuoyancyPlugin::OnUpdate() {
             // Clamp Z value
             fluid_velocity_.Z(ignition::math::clamp(fluid_velocity_.Z(),
                 zRange.X(), zRange.Y()));
-           // }
 
             // get velocity damping
             // linear velocity difference in the link frame
