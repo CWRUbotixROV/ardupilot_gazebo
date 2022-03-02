@@ -53,8 +53,9 @@ private:
     std::vector<model_st> parsed_models_;
 
     ignition::math::Vector3d fluid_velocity_;
-    double velocityFactor;
-    double clampingValue;
+    double velocity_factor;
+    double clamping_value;
+    int seed;
     ignition::math::Vector2d xRange;
     ignition::math::Vector2d yRange;
     ignition::math::Vector2d zRange;
