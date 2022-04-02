@@ -52,11 +52,14 @@ void FreeBuoyancyPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
 
     if (_sdf->HasElement("fluidTopic"))  fluid_topic = _sdf->Get<std::string>("fluidTopic");
     if (_sdf->HasElement("velocityFactor"))  velocity_factor = _sdf->Get<double>("velocityFactor");
+    if (_sdf->HasElement("velocityRotateFactor"))  velocity_rotate_factor = _sdf->Get<double>("velocityRotateFactor");
     if (_sdf->HasElement("clampingValue"))  clamping_value = _sdf->Get<double>("clampingValue");
+    if (_sdf->HasElement("clampingRotateValue"))  clamping_rotate_value = _sdf->Get<double>("clampingRotateValue");
     if (_sdf->HasElement("seed"))  seed = _sdf->Get<int>("seed");
 
-    //magic number area!
+    // Magic number area!
     fluid_velocity_.Set(0, 0, 0);
+    fluid_rotate_velocity_.Set(0, 0, 0);
 
     // Register plugin update
     update_event_ = event::Events::ConnectWorldUpdateBegin(boost::bind(&FreeBuoyancyPlugin::OnUpdate, this));
@@ -112,7 +115,7 @@ void FreeBuoyancyPlugin::OnUpdate() {
         // here buoy_links is up-to-date with the links that are subject to buoyancy, let's apply it
         ignition::math::Vector3d actual_force, cob_position, velocity_difference, torque;
         double signed_distance_to_surface;
-        for (std::vector<link_st>::iterator link_it = buoyant_links_.begin(); link_it!=buoyant_links_.end(); ++link_it) {
+        for (std::vector<link_st>::iterator link_it = buoyant_links_.begin(); link_it != buoyant_links_.end(); ++link_it) {
             // get world position of the center of buoyancy
             cob_position = link_it->link->WorldPose().Pos() + link_it->link->WorldPose().Rot().RotateVector(link_it->buoyancy_center);
             // start from the theoretical buoyancy force
@@ -133,7 +136,7 @@ void FreeBuoyancyPlugin::OnUpdate() {
                 }
             }
 
-            //Set xyz clamps
+            // Set xyz clamps
             xRange.X(fluid_velocity_.X() - clamping_value);
             xRange.Y(fluid_velocity_.X() + clamping_value);
             yRange.X(fluid_velocity_.Y() - clamping_value);
@@ -141,49 +144,74 @@ void FreeBuoyancyPlugin::OnUpdate() {
             zRange.X(fluid_velocity_.Z() - clamping_value);
             zRange.Y(fluid_velocity_.Z() + clamping_value);
 
-            //get Random XYZ values for waves and set into random_value and pass into fluid_velocity
+            // get Random XYZ values for waves and pass into fluid_velocity
             // Get a random velocity value.
             fluid_velocity_.Set(
                 ignition::math::Rand::DblUniform(-1, 1),
                 ignition::math::Rand::DblUniform(-1, 1),
-                ignition::math::Rand::DblUniform(-1, 1));
-
+                ignition::math::Rand::DblUniform(-1, 1)
+            );
 
             // Apply scaling factor
             fluid_velocity_.Normalize();
             fluid_velocity_ *= velocity_factor;
 
-
-            // Clamp X value
-            fluid_velocity_.X(ignition::math::clamp(fluid_velocity_.X(),
-                xRange.X(), xRange.Y()));
-
-            // Clamp Y value
-            fluid_velocity_.Y(ignition::math::clamp(fluid_velocity_.Y(),
-                yRange.X(), yRange.Y()));
-
-            // Clamp Z value
-            fluid_velocity_.Z(ignition::math::clamp(fluid_velocity_.Z(),
-                zRange.X(), zRange.Y()));
+            // Clamp X, Y, Z values
+            fluid_velocity_.X( ignition::math::clamp(fluid_velocity_.X(), xRange.X(), xRange.Y()) );
+            fluid_velocity_.Y( ignition::math::clamp(fluid_velocity_.Y(), yRange.X(), yRange.Y()) );
+            fluid_velocity_.Z( ignition::math::clamp(fluid_velocity_.Z(), zRange.X(), zRange.Y()) );
 
             // get velocity damping
             // linear velocity difference in the link frame
+            // Subtract intended velocity from current velocity to set new velocity
             velocity_difference = link_it->link->WorldPose().Rot().RotateVectorReverse(link_it->link->WorldLinearVel() - fluid_velocity_);
-            // to square
-            velocity_difference.X()*= fabs(velocity_difference.X());
-            velocity_difference.Y()*= fabs(velocity_difference.Y());
-            velocity_difference.Z()*= fabs(velocity_difference.Z());
+            
+            // Square all dims of velocity_difference w/o changing sign
+            velocity_difference.X() *= fabs(velocity_difference.X());
+            velocity_difference.Y() *= fabs(velocity_difference.Y());
+            velocity_difference.Z() *= fabs(velocity_difference.Z());
+            
             // apply damping coefficients
             actual_force -= link_it->link->WorldPose().Rot().RotateVector(link_it->linear_damping * velocity_difference);
 
             link_it->link->AddForceAtWorldPosition(actual_force, cob_position);
 
-            // same for angular damping
-            velocity_difference = link_it->link->RelativeAngularVel();
-            velocity_difference.X()*= fabs(velocity_difference.X());
-            velocity_difference.Y()*= fabs(velocity_difference.Y());
-            velocity_difference.Z()*= fabs(velocity_difference.Z());
-            link_it->link->AddRelativeTorque(-link_it->angular_damping*velocity_difference);
+
+            // Same stuff for torque
+
+            // Set xyz clamps
+            xRange.X(fluid_rotate_velocity_.X() - clamping_rotate_value);
+            xRange.Y(fluid_rotate_velocity_.X() + clamping_rotate_value);
+            yRange.X(fluid_rotate_velocity_.Y() - clamping_rotate_value);
+            yRange.Y(fluid_rotate_velocity_.Y() + clamping_rotate_value);
+            zRange.X(fluid_rotate_velocity_.Z() - clamping_rotate_value);
+            zRange.Y(fluid_rotate_velocity_.Z() + clamping_rotate_value);
+
+            // get Random XYZ values for torque waves and pass into fluid_rotate_velocity
+            // Get a random velocity value.
+            fluid_rotate_velocity_.Set(
+                ignition::math::Rand::DblUniform(-1, 1),
+                ignition::math::Rand::DblUniform(-1, 1),
+                ignition::math::Rand::DblUniform(-1, 1)
+            );
+
+            // Apply scaling factor
+            // Normalize() crashes everything for some reason (i hate c++), just manually normalize instead
+            // fluid_rotate_velocity_.Normalize();
+            fluid_rotate_velocity_ /= fluid_rotate_velocity_.Length();
+            fluid_rotate_velocity_ *= velocity_rotate_factor;
+
+            // Clamp X, Y, Z values
+            fluid_rotate_velocity_.X( ignition::math::clamp(fluid_rotate_velocity_.X(), xRange.X(), xRange.Y()) );
+            fluid_rotate_velocity_.Y( ignition::math::clamp(fluid_rotate_velocity_.Y(), yRange.X(), yRange.Y()) );
+            fluid_rotate_velocity_.Z( ignition::math::clamp(fluid_rotate_velocity_.Z(), zRange.X(), zRange.Y()) );
+
+            // Subtract intended velocity from current velocity to set new velocity
+            velocity_difference = link_it->link->WorldPose().Rot().RotateVectorReverse(link_it->link->RelativeAngularVel() - fluid_rotate_velocity_);
+            velocity_difference.X() *= fabs(velocity_difference.X());
+            velocity_difference.Y() *= fabs(velocity_difference.Y());
+            velocity_difference.Z() *= fabs(velocity_difference.Z());
+            link_it->link->AddRelativeTorque(-link_it->angular_damping * velocity_difference);
 
             ignition::math::Vector3d vec;
             ignition::math::Pose3d pose;
